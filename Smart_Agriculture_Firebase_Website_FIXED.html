@@ -22,5 +22,33 @@
 <script>
 function show(id){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');scrollTo(0,0)}
 function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v}
-async function loadData(){try{const r=await fetch('https://smart-agriculture-innovation-default-rtdb.asia-southeast1.firebasedatabase.app/agriculture/latest.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('Firebase HTTP '+r.status);const a=await r.json();const online=!!(a&&typeof a==='object'&&('soil1'in a||'soil2'in a||'averageMoisture'in a));const avg=Number(a?.averageMoisture??0);const pump=String(a?.pump??'OFF').toUpperCase()==='ON';setText('avg',online?(avg+'%'):'--%');setText('avg2',online?(avg+'%'):'--%');setText('soil1',online?(a.soil1+'%'):'--%');setText('soil2',online?(a.soil2+'%'):'--%');setText('pump',online?(pump?'ON':'OFF'):'--');setText('pump2',online?(pump?'ON':'OFF'):'--');setText('alert',online?'NORMAL':'--');setText('alert2',online?'Live moisture monitoring active.':'Live data હજુ ઉપલબ્ધ નથી.');setText('temp',online&&a.temperature!=null?(a.temperature+' °C'):'-- °C');setText('hum',online&&a.humidity!=null?(a.humidity+' %'):'-- %');setText('advice',online?(avg<40?'સિંચાઈ જરૂરી':avg<60?'હળવી સિંચાઈ પર વિચાર કરો':'હાલ સિંચાઈની જરૂર નથી'):'--');['agriBadge','combinedAgriBadge'].forEach(id=>{const e=document.getElementById(id);if(e){e.className='badge '+(online?'live':'off');e.textContent=online?'LIVE':'OFFLINE'}});const s=document.getElementById('projectStatus');if(s){s.className='status '+(online?'live':'');s.textContent=online?'🟢 PROJECT LIVE — Firebase live data મળ્યું છે':'⚫ PROJECT OFFLINE — Firebase data હજુ ઉપલબ્ધ નથી'}setText('updated',online?'Live data connected to Firebase':'Live data source: waiting for Firebase data')}catch(e){setText('updated','Firebase connection waiting')}}loadData();setInterval(loadData,15000);
+const FIREBASE_LIVE_URL='https://smart-agriculture-innovation-default-rtdb.asia-southeast1.firebasedatabase.app/agriculture/latest.json';
+async function loadData(){
+ try{
+  const r=await fetch(FIREBASE_LIVE_URL+'?ts='+Date.now(),{cache:'no-store'});
+  if(!r.ok) throw new Error('Firebase read blocked: HTTP '+r.status);
+  const a=await r.json();
+  if(!a || typeof a!=='object') throw new Error('Waiting for ESP32 data');
+  const s1=Number(a.soil1), s2=Number(a.soil2);
+  const avg=Number(a.averageMoisture ?? a.average ?? ((s1+s2)/2));
+  const online=Number.isFinite(avg) && Number.isFinite(s1) && Number.isFinite(s2);
+  const pumpOn=(a.pump===true || String(a.pump).trim().toUpperCase()==='ON' || String(a.pump)==='1');
+  setText('avg',online?(avg+'%'):'--%'); setText('avg2',online?(avg+'%'):'--%');
+  setText('soil1',online?(s1+'%'):'--%'); setText('soil2',online?(s2+'%'):'--%');
+  setText('pump',online?(pumpOn?'ON':'OFF'):'--'); setText('pump2',online?(pumpOn?'ON':'OFF'):'--');
+  setText('alert',online?(a.earlyAlert||'NORMAL'):'--');
+  setText('alert2',online?'Early Alert: '+(a.earlyAlert||'NORMAL'):'Live data હજુ ઉપલબ્ધ નથી.');
+  setText('temp',Number.isFinite(Number(a.temperature))?(a.temperature+' °C'):'-- °C');
+  setText('hum',Number.isFinite(Number(a.humidity))?(a.humidity+' %'):'-- %');
+  setText('advice',online?(avg<40?'સિંચાઈ જરૂરી':avg<60?'હળવી સિંચાઈ પર વિચાર કરો':'હાલ સિંચાઈની જરૂર નથી'):'--');
+  ['agriBadge','combinedAgriBadge'].forEach(id=>{const e=document.getElementById(id);if(e){e.className='badge '+(online?'live':'off');e.textContent=online?'LIVE':'OFFLINE'}});
+  const st=document.getElementById('projectStatus'); if(st){st.className='status '+(online?'live':'');st.textContent=online?'🟢 PROJECT LIVE — Firebase માંથી live data મળ્યો છે':'⚫ PROJECT OFFLINE — live data મળ્યો નથી'}
+  setText('updated',online?'Firebase live data connected':'Firebase માં હજી live data નથી');
+ }catch(e){
+  ['agriBadge','combinedAgriBadge'].forEach(id=>{const el=document.getElementById(id);if(el){el.className='badge off';el.textContent='OFFLINE'}});
+  const st=document.getElementById('projectStatus');if(st){st.className='status';st.textContent='⚫ PROJECT OFFLINE — Firebase connection/read permission તપાસવાની જરૂર છે'}
+  setText('updated','Firebase live data મળતું નથી (database read permission અથવા ESP32 upload તપાસો)');
+ }
+}
+loadData();setInterval(loadData,15000);
 </script></body></html>
